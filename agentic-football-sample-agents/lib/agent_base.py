@@ -6,8 +6,24 @@ from strands import Agent
 from strands.models import BedrockModel
 
 from parsing import parse_commands
-from state import summarize_state
+from state import summarize_state, get_possession_info
 from fallback import FallbackConfig, build_last_resort
+
+# Commands that only make sense while holding the ball — anything else is a
+# wasted tick (match 1: 87 SHOOT commands, only 2 real shots; match 2: 48 → 3).
+POSSESSION_ONLY = {"SHOOT", "PASS", "GK_DISTRIBUTE"}
+
+
+def _drop_ghost_commands(
+    commands: list[dict], game_state: dict, team_id: int, my_player_id: int
+) -> list[dict]:
+    """Remove possession-only commands when the player doesn't hold the ball."""
+    possession_id, _, is_mine = get_possession_info(
+        game_state.get("ball", {}), game_state.get("players", []), team_id
+    )
+    if is_mine and possession_id == my_player_id:
+        return commands
+    return [c for c in commands if c.get("commandType") not in POSSESSION_ONLY]
 
 
 def create_agent(system_prompt: str, model_id: str = "us.amazon.nova-micro-v1:0") -> Agent:
@@ -56,6 +72,11 @@ def create_invoke_handler(
             response_text = str(response)
 
             commands = parse_commands(response_text, team_id, effective_pid)
+            ghosts = len(commands)
+            commands = _drop_ghost_commands(commands, game_state, team_id, effective_pid)
+            if ghosts and not commands:
+                log.warn(f"{position_label}: dropped {ghosts} possession-only command(s) "
+                         f"issued without the ball; using fallback")
 
             if commands:
                 log.info(f"LLM returned {len(commands)} commands: "
