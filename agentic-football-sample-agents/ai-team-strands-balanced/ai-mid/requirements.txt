@@ -4,3 +4,5 @@ bedrock-agentcore>=1.0.3
 bedrock-agentcore-starter-toolkit>=0.3.2
 # OTEL instrumentation for observability
 aws-opentelemetry-distro>=0.10.0
+# AgentCore Browser + Code Interpreter tools (used only when AGENTCORE_TOOLS=1)
+strands-agents-tools>=0.2.0

@@ -94,8 +94,14 @@ def deploy(staging_dir):
     env["PYTHONUNBUFFERED"] = "1"
     env["AGENTCORE_SUPPRESS_RECOMMENDATION"] = "1"
 
+    # Forward trophy/feature env vars to the runtime when set locally
+    cmd = ["agentcore", "deploy", "--auto-update-on-conflict"]
+    for var in ("GUARDRAIL_ID", "GUARDRAIL_VERSION", "AGENTCORE_TOOLS"):
+        if os.environ.get(var):
+            cmd += ["--env", f"{var}={os.environ[var]}"]
+
     proc = subprocess.Popen(
-        ["agentcore", "deploy", "--auto-update-on-conflict"],
+        cmd,
         cwd=str(staging_dir),
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,

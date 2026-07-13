@@ -27,8 +27,41 @@ def _drop_ghost_commands(
 
 
 def create_agent(system_prompt: str, model_id: str = "us.amazon.nova-micro-v1:0") -> Agent:
-    """Create a Strands Agent with the given system prompt."""
-    model = BedrockModel(model_id=model_id)
+    """Create a Strands Agent with the given system prompt.
+
+    If GUARDRAIL_ID is set in the environment, attaches that Bedrock Guardrail
+    to every model invocation (GUARDRAIL_VERSION defaults to "1").
+    If AGENTCORE_TOOLS=1, attaches AgentCore Browser + Code Interpreter tools
+    (adds latency — enable only for trophy/practice runs, not competitive matches).
+    """
+    import os
+
+    guardrail_id = os.environ.get("GUARDRAIL_ID")
+    if guardrail_id:
+        model = BedrockModel(
+            model_id=model_id,
+            guardrail_id=guardrail_id,
+            guardrail_version=os.environ.get("GUARDRAIL_VERSION", "1"),
+        )
+    else:
+        model = BedrockModel(model_id=model_id)
+
+    tools = []
+    if os.environ.get("AGENTCORE_TOOLS") == "1":
+        region = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
+        try:
+            from strands_tools.browser import AgentCoreBrowser
+            tools.append(AgentCoreBrowser(region=region).browser)
+        except Exception as e:  # tools are best-effort; never break the match agent
+            print(f"[agent_base] Browser tool unavailable: {e}")
+        try:
+            from strands_tools.code_interpreter import AgentCoreCodeInterpreter
+            tools.append(AgentCoreCodeInterpreter(region=region).code_interpreter)
+        except Exception as e:
+            print(f"[agent_base] Code Interpreter tool unavailable: {e}")
+
+    if tools:
+        return Agent(model=model, system_prompt=system_prompt, tools=tools)
     return Agent(model=model, system_prompt=system_prompt)
 
 
