@@ -96,7 +96,8 @@ def deploy(staging_dir):
 
     # Forward trophy/feature env vars to the runtime when set locally
     cmd = ["agentcore", "deploy", "--auto-update-on-conflict"]
-    for var in ("GUARDRAIL_ID", "GUARDRAIL_VERSION", "AGENTCORE_TOOLS"):
+    for var in ("GUARDRAIL_ID", "GUARDRAIL_VERSION", "AGENTCORE_TOOLS",
+                "GATEWAY_URL", "MEMORY_ID", "AWS_DEFAULT_REGION"):
         if os.environ.get(var):
             cmd += ["--env", f"{var}={os.environ[var]}"]
 

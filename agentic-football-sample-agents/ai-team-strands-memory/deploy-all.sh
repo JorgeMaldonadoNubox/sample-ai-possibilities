@@ -144,9 +144,11 @@ for agent in "${AGENTS[@]}"; do
     "$AGENT_SRC/.bedrock_agentcore.yaml.template" > "$STAGE/.bedrock_agentcore.yaml"
 
   echo "  Deploying from: $STAGE"
-  if (cd "$STAGE" && agentcore deploy --auto-update-on-conflict \
-    --env "MEMORY_ID=$MEMORY_ID" \
-    --env "AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION"); then
+  # Use the balanced team's deploy helper: it patches the toolkit for Windows
+  # path separators and injects the OTEL Linux shim, then forwards MEMORY_ID /
+  # AWS_DEFAULT_REGION as runtime --env vars.
+  export MEMORY_ID AWS_DEFAULT_REGION
+  if python "$SCRIPT_DIR/../ai-team-strands-balanced/_deploy_helper.py" "$STAGE"; then
     echo "  ✅ $agent: DEPLOYED"
     DEPLOYED+=("$agent")
   else

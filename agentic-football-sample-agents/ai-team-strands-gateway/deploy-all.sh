@@ -115,7 +115,9 @@ else
     TMPDIR=$(mktemp -d)
     cp "$TOOL_FILE" "$TMPDIR/lambda_function.py"
     sed -i'' -e 's/^def handler(/def lambda_handler(/' "$TMPDIR/lambda_function.py"
-    (cd "$TMPDIR" && zip -q function.zip lambda_function.py)
+    # Use python's zipfile instead of the `zip` binary (not present on
+    # Windows/Git Bash by default)
+    (cd "$TMPDIR" && python3 -c "import zipfile; zipfile.ZipFile('function.zip','w').write('lambda_function.py')")
 
     if [ $FUNC_EXISTS -ne 0 ]; then
       echo "  Creating: $FUNC_NAME"
@@ -253,9 +255,11 @@ for agent in "${AGENTS[@]}"; do
   REAL_PYTHON=$(python3 -c "import os,sys; print(os.path.realpath(sys.executable))")
   export UV_PYTHON="$REAL_PYTHON"
   export UV_PYTHON_PREFERENCE="only-system"
-  if (cd "$STAGE" && agentcore deploy --auto-update-on-conflict \
-    --env "GATEWAY_URL=$GATEWAY_URL" \
-    --env "AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION"); then
+  # Use the balanced team's deploy helper: it patches the toolkit for Windows
+  # path separators and injects the OTEL Linux shim, then forwards GATEWAY_URL /
+  # AWS_DEFAULT_REGION as runtime --env vars.
+  export GATEWAY_URL AWS_DEFAULT_REGION
+  if python "$SCRIPT_DIR/../ai-team-strands-balanced/_deploy_helper.py" "$STAGE"; then
     echo "  ✅ $agent: DEPLOYED"
     DEPLOYED+=("$agent")
   else
