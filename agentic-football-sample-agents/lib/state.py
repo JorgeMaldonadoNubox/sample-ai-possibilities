@@ -78,6 +78,7 @@ def summarize_state(
     game_time = game_state.get("gameTime", 0)
     play_mode = game_state.get("playMode", 0)
     players = game_state.get("players", [])
+    team_chat = game_state.get("teamChat", []) or []
 
     my_team = sorted(
         [p for p in players if _is_my_team(p, team_id)],
@@ -100,6 +101,17 @@ def summarize_state(
         f"Your goal at x={my_goal_x:.0f} | Opponent goal at x={opp_goal_x:.0f}",
         "",
     ]
+
+    # Coach instructions (teamChat): forward the latest message so the LLM can
+    # act on it. Without this the prompts' "read gameState.teamChat" is dead —
+    # the agent only ever sees this text summary, never the raw gameState.
+    if team_chat:
+        latest = team_chat[-1]
+        if isinstance(latest, dict):
+            latest = latest.get("message") or latest.get("text") or latest.get("content", "")
+        if latest:
+            lines.append(f">>> COACH (teamChat): {latest}")
+            lines.append("")
 
     # My player info
     if me:
