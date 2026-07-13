@@ -38,6 +38,15 @@ def _clamp(v, lo, hi):
     return max(lo, min(hi, v))
 
 
+# Known command parameter keys — used to rescue params the LLM emitted at the
+# top level of the command object instead of nested under "parameters".
+PARAM_KEYS = {
+    "target_x", "target_y", "sprint", "target_player_id", "type",
+    "aim_location", "power", "intensity", "tightness", "aggressive",
+    "target_team", "distance", "method", "stance",
+}
+
+
 def _tag_commands(commands: list, team_id: int, my_player_id: int) -> list[dict]:
     """Add teamId and playerId to each command, filtering to valid ones."""
     result = []
@@ -48,13 +57,21 @@ def _tag_commands(commands: list, team_id: int, my_player_id: int) -> list[dict]
             # Skip unrecognized command types
             if cmd["commandType"] not in VALID_COMMANDS:
                 continue
-            # Clamp MOVE_TO coordinates to field bounds
+            # Rescue params emitted at the top level instead of under "parameters"
+            params = cmd.get("parameters")
+            if not isinstance(params, dict):
+                params = {}
+            for key in PARAM_KEYS & cmd.keys():
+                params.setdefault(key, cmd.pop(key))
+            cmd["parameters"] = params
+            # Clamp MOVE_TO coordinates safely inside the field (players were
+            # drifting off the pitch when targeting the exact boundary lines)
             if cmd["commandType"] == "MOVE_TO":
                 params = cmd.get("parameters", {})
                 if isinstance(params.get("target_x"), (int, float)):
-                    params["target_x"] = _clamp(params["target_x"], -55, 55)
+                    params["target_x"] = _clamp(params["target_x"], -50, 50)
                 if isinstance(params.get("target_y"), (int, float)):
-                    params["target_y"] = _clamp(params["target_y"], -35, 35)
+                    params["target_y"] = _clamp(params["target_y"], -28, 28)
             # Ensure PASS/MARK/FOLLOW_PLAYER/GK_DISTRIBUTE/SLIDE_TACKLE have target_player_id
             if cmd["commandType"] in ("PASS", "MARK", "FOLLOW_PLAYER", "GK_DISTRIBUTE", "SLIDE_TACKLE"):
                 params = cmd.get("parameters", {})
